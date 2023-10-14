@@ -1,6 +1,6 @@
 # RUSTLIBFILT  
 
-rustlibfilt è una libreria python scritta in rust per il design e l'implementazione di filtri digitali.  
+A python library, written in Rust, for the design and implentation of digital audio filters  
 
 how to use `rustlibfilt`:
 
