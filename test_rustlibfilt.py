@@ -17,7 +17,7 @@ def main() -> None:
     
     del_sample = int(0.037 * SR)
     comb1 = Harmonic(mode="lpcombi", buffer_delay=del_sample, fs=SR)
-    comb1.design_filter(t60=1.5, fs=SR, fc=100)
+    comb1.design_filter(t60=1.5, fc=100)
     
     allpass = Harmonic(mode="lpallpass", buffer_delay=del_sample, fs=SR)
     allpass.design_filter(t60=1.5, fc=1500)
@@ -32,7 +32,7 @@ def main() -> None:
     
     noise = np.random.uniform(low=-1, high=1, size=len(SIG))
     bp = Narrow(fs=SR)
-    bp_coeffs = bp.design_filter(mode="notch", fc=5000, bw=1000)
+    bp_coeffs = bp.design_filter(mode="bp", fc=5000, bw=1000)
     
     tp = TwoZeroTwoPole(fs=SR)
     tp_coeffs = tp.design_filter(mode="notch", fc=2500, bw=5)
@@ -46,7 +46,13 @@ def main() -> None:
         # y[i] = bp.filt_sample(sample=noise[i], coeffs=bp_coeffs)
         y[i] = tp.filt_sample(sample=noise[i], coeffs=tp_coeffs)
     
-    sf.write("filt.wav", data=y, samplerate=SR, subtype="PCM_16")
+    y = tp.filt_frame(frame=SIG, coeffs=tp_coeffs)
+    y = bp.filt_frame(frame=SIG, coeffs=bp_coeffs)
+    y = lp_onepole.filt_frame(frame=SIG, coeffs=lp_onepole_coeffs)
+    y = hp_onepole.filt_frame(frame=SIG, coeffs=hp_onepole_coeffs)
+    y = comb1.filt_frame(frame=SIG)
+    
+    # sf.write("filt.wav", data=y, samplerate=SR, subtype="PCM_16")
     
     
     # # for sample in x:
