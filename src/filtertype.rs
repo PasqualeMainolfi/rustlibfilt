@@ -1,3 +1,5 @@
+// TODO: Butterworth and Chebisev
+
 pub enum BiquadFilterType {
     Lp,
     Hp,
@@ -14,7 +16,6 @@ pub enum TwoZeroTwoPoleFilterType {
     Notch,
     Bp,
 }
-
 pub enum HarmonicFilterType {
     CombFIR,
     CombFreeverbFIR,
@@ -39,3 +40,9 @@ pub enum NarrowFilterType {
     Notch
 }
 
+pub enum ZavalishinFilterType {
+    OnePoleZeroDelay,
+    NaiveOnePole,
+    TrapIntOnePole,
+    StateVariable
+}
