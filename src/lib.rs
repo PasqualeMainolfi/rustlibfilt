@@ -7,6 +7,7 @@ pub mod dc;
 pub mod harmonic;
 pub mod narrow;
 pub mod zavalishin;
+pub mod butter;
 
 use pyo3::prelude::*;
 use biquadeq::Biquad;
@@ -16,6 +17,7 @@ use dc::DcFilter;
 use harmonic::Harmonic;
 use narrow::Narrow;
 use zavalishin::Zavalishin;
+use butter::Butter;
 
 
 /// A Python module implemented in Rust.
@@ -28,5 +30,6 @@ fn rustlibfilt(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Harmonic>()?;
     m.add_class::<Narrow>()?;
     m.add_class::<Zavalishin>()?;
+    m.add_class::<Butter>()?;
     Ok(())
 }

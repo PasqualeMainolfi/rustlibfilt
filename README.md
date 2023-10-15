@@ -107,3 +107,4 @@ Filter types:
 - <https://www.musicdsp.org/en/latest/Filters/index.html>
 - <https://www.dspguide.com/ch19.htm>
 - BQD filter design equation, AN2874 Applications note, STMicroelectronics, 2009
+- D. Horvath; Z. Cervenanska: J. Kotianova, Digital implementation of Butterworth first-order filter type IIR

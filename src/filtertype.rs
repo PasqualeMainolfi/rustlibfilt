@@ -46,3 +46,10 @@ pub enum ZavalishinFilterType {
     TrapIntOnePole,
     StateVariable
 }
+
+pub enum ButterFilterType {
+    Lp,
+    Hp,
+    Bp,
+    Notch
+}
