@@ -50,6 +50,5 @@ pub enum ZavalishinFilterType {
 pub enum ButterFilterType {
     Lp,
     Hp,
-    Bp,
-    Notch
+    Bp
 }

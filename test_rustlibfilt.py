@@ -1,5 +1,5 @@
 # import section
-from rustlibfilt import Biquad, Harmonic, OnePole, Narrow, TwoZeroTwoPole
+from rustlibfilt import Biquad, Harmonic, OnePole, Narrow, TwoZeroTwoPole, Zavalishin, Butter
 import librosa as lb
 import soundfile as sf
 import numpy as np
@@ -39,12 +39,24 @@ def main() -> None:
     
     print(tp_coeffs)
     
+    but1 = Butter(fs=SR)
+    but2 = Butter(fs=SR)
+    but_coeffs = but1.design_filter(mode="lp", fc=1000)
+    
+    print(but_coeffs)
+    
+    zav = Zavalishin(fs=SR)
+    zav.design_filter(mode="zdf", fc=500)
+    
+    
     y = np.zeros(len(SIG))
     for i in range(len(SIG)):
         # y[i] = hp_onepole.filt_sample(sample=SIG[i], coeffs=hp_onepole_coeffs)
         # y[i] = comb1.filt_sample(sample=SIG[i])
         # y[i] = bp.filt_sample(sample=noise[i], coeffs=bp_coeffs)
         y[i] = tp.filt_sample(sample=noise[i], coeffs=tp_coeffs)
+        z = zav.filt_sample(sample=noise[i])
+        y[i] = z[1]
     
     y = tp.filt_frame(frame=SIG, coeffs=tp_coeffs)
     y = bp.filt_frame(frame=SIG, coeffs=bp_coeffs)
@@ -52,7 +64,10 @@ def main() -> None:
     y = hp_onepole.filt_frame(frame=SIG, coeffs=hp_onepole_coeffs)
     y = comb1.filt_frame(frame=SIG)
     
-    # sf.write("filt.wav", data=y, samplerate=SR, subtype="PCM_16")
+    y = but1.filt_frame(frame=noise, coeffs=but_coeffs)
+    # y = but2.filt_frame(frame=y, coeffs=but_coeffs)
+    
+    sf.write("filt.wav", data=y, samplerate=SR, subtype="PCM_16")
     
     
     # # for sample in x:

@@ -18,26 +18,24 @@ impl DesignButterFilter {
 
     fn coeffs(&mut self, mode: ButterFilterType, fc: f64, fs: f64) {
         let twopi = std::f64::consts::PI;
-        let wd = twopi * fc;
-        let ts = 1.0 / fs;
-        let wdts = wd * ts / 2.0; 
+        let wc = twopi * fc / fs;
+        let wtan = 2.0 * wc.tan();
         match mode {
             ButterFilterType::Lp => {
-                let b0 = 2.0 * wdts.tan() / (2.0 + 2.0 * wdts.tan());
+                let b0 = wtan / (2.0 + wtan);
                 let b1 = b0;
-                let a1 = (2.0 * wdts.tan() - 2.0) / (2.0 + 2.0 * wdts.tan());
+                let a1 = (wtan - 2.0) / (2.0 + wtan);
 
                 self.filt_coeffs.set_coeffs((b0, b1, a1))
             },
             ButterFilterType::Hp => {
-                let b0 = 2.0 / (2.0 + 2.0 * wdts.tan());
+                let b0 = 2.0 / (2.0 + wtan);
                 let b1 = -b0;
-                let a1 = (2.0 * wdts.tan() - 2.0) / (2.0 + 2.0 * wdts.tan());
+                let a1 = (wtan - 2.0) / (2.0 + wtan);
 
                 self.filt_coeffs.set_coeffs((b0, b1, a1))
             },
             ButterFilterType::Bp => {},
-            ButterFilterType::Notch => {}
         }
     }
 }
@@ -50,8 +48,8 @@ fn _filt_sample(sample: &f64, coeffs: &[f64], x1: f64, y1: f64) -> f64 {
 pub struct Butter {
     mode: String,
     fs: f64,
-    xlp: f64,
-    ylp: f64,
+    xtemp: f64,
+    ytemp: f64,
     x1: f64,
     y1: f64,
 
@@ -71,7 +69,7 @@ impl Butter {
     ///
 
     pub fn new(fs: f64) -> Self {
-        Self { mode: String::from(""), fs, xlp: 0.0, ylp: 0.0, x1: 0.0, y1: 0.0 }
+        Self { mode: String::from(""), fs, xtemp: 0.0, ytemp: 0.0, x1: 0.0, y1: 0.0 }
     }
 
     ///
@@ -83,7 +81,6 @@ impl Butter {
     ///         lp = first order butterworth low pass filter IIR
     ///         hp = first order butterworth high pass filter IIR
     ///         bp = band pass from lp + hp
-    ///         br = band reject
     ///     fc: f64
     ///         cut off frequency in Hz
     ///
@@ -100,7 +97,6 @@ impl Butter {
             "lp" => ButterFilterType::Lp,
             "hp" => ButterFilterType::Hp,
             "bp" => ButterFilterType::Bp,
-            "br" => ButterFilterType::Notch,
             _ => {
                 println!("[ERROR] Filter mode not allowed!");
                 std::process::exit(1)
@@ -113,13 +109,16 @@ impl Butter {
 
         let coeffs: Vec<f64> = match bw {
                 Some(value) => {
+
+                    let flp = fc + value / 2.0;
+                    let fhp = fc - value / 2.0;
     
-                    design_filter.coeffs(ButterFilterType::Lp, fc + value / 2.0, self.fs);
+                    design_filter.coeffs(ButterFilterType::Lp, flp, self.fs);
                     let b0lp = design_filter.filt_coeffs.b0; 
                     let b1lp = design_filter.filt_coeffs.b1;
                     let a1lp = design_filter.filt_coeffs.a1;
     
-                    design_filter.coeffs(ButterFilterType::Hp, fc - value / 2.0, self.fs);
+                    design_filter.coeffs(ButterFilterType::Hp, fhp, self.fs);
                     let b0hp = design_filter.filt_coeffs.b0; 
                     let b1hp = design_filter.filt_coeffs.b1;
                     let a1hp = design_filter.filt_coeffs.a1;
@@ -160,17 +159,17 @@ impl Butter {
     #[pyo3(text_signature = "(sample: float, coeffs: list[float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: Vec<f64>) -> f64 {
 
-        let (y, xlp, ylp, x1, y1) = if self.mode.eq("bp") || self.mode.eq("br") {
-            let _ylp = _filt_sample(&sample, &coeffs[0..2], self.xlp, self.ylp);
-            let _y = _filt_sample(&_ylp, &coeffs[3..5], self.x1, self.y1);
-            (_y, sample, _ylp, _ylp, _y)
+        let (y, xtemp, ytemp, x1, y1) = if self.mode.eq("bp") || self.mode.eq("br") {
+            let _ytemp = _filt_sample(&sample, &coeffs[0..3], self.xtemp, self.ytemp);
+            let _y = _filt_sample(&_ytemp, &coeffs[3..6], self.x1, self.y1);
+            (_y, sample, _ytemp, _ytemp, _y)
         } else {
             let _y = _filt_sample(&sample, &coeffs, self.x1, self.y1);
             (_y, 0.0, 0.0, sample, _y)
         };
 
-        self.xlp = xlp;
-        self.ylp = ylp;
+        self.xtemp = xtemp;
+        self.ytemp = ytemp;
         self.x1 = x1;
         self.y1 = y1;
         
@@ -208,15 +207,15 @@ impl Butter {
     ///
     /// CLEAR DELAYED SAMPLES CACHE
     /// set:
-    ///     xlp[n - 1] = 0.0
-    ///     ylp[n - 1] = 0.0
+    ///     xtemp[n - 1] = 0.0
+    ///     ytemp[n - 1] = 0.0
     ///     x1[n - 1] = 0.0
     ///     y1[n - 1] = 0.0
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.xlp = 0.0;
-        self.ylp = 0.0;
+        self.xtemp = 0.0;
+        self.ytemp = 0.0;
         self.x1 = 0.0;
         self.y1 = 0.0;
         println!("[DONE] cache cleared!")

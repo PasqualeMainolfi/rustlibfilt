@@ -117,7 +117,7 @@ impl Zavalishin {
                 println!("[ERROR] Filter mode not allowed!");
                 std::process::exit(1)
             }
-        };
+        }
     }
     
     ///
