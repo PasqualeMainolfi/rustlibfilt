@@ -22,7 +22,7 @@ def main() -> None:
     allpass = Harmonic(mode="lpallpass", buffer_delay=del_sample, fs=SR)
     allpass.design_filter(t60=1.5, fc=1500)
     
-    lp_onepole = OnePole(fs=SR)
+    lp_onepole = OnePole(fs=SR, order=3)
     lp_onepole_coeffs = lp_onepole.design_filter(mode="lp", fc=100)
     print(lp_onepole_coeffs)
     
@@ -31,16 +31,16 @@ def main() -> None:
     print(hp_onepole_coeffs)
     
     noise = np.random.uniform(low=-1, high=1, size=len(SIG))
-    bp = Narrow(fs=SR)
-    bp_coeffs = bp.design_filter(mode="bp", fc=5000, bw=1000)
+    bp = Narrow(fs=SR, order=3)
+    bp_coeffs = bp.design_filter(mode="bp", fc=5000, bw=10)
     
     tp = TwoZeroTwoPole(fs=SR)
     tp_coeffs = tp.design_filter(mode="notch", fc=2500, bw=5)
     
     print(tp_coeffs)
     
-    but1 = Butter(fs=SR)
-    but2 = Butter(fs=SR)
+    but1 = Butter(fs=SR, order=6)
+    but2 = Butter(fs=SR, order=3)
     but_coeffs = but1.design_filter(mode="lp", fc=1000)
     
     print(but_coeffs)
@@ -60,11 +60,12 @@ def main() -> None:
     
     y = tp.filt_frame(frame=SIG, coeffs=tp_coeffs)
     y = bp.filt_frame(frame=SIG, coeffs=bp_coeffs)
-    y = lp_onepole.filt_frame(frame=SIG, coeffs=lp_onepole_coeffs)
-    y = hp_onepole.filt_frame(frame=SIG, coeffs=hp_onepole_coeffs)
-    y = comb1.filt_frame(frame=SIG)
+    y = lp_onepole.filt_frame(frame=noise, coeffs=lp_onepole_coeffs)
+    y = bp.filt_frame(frame=noise, coeffs=bp_coeffs)
+    # y = hp_onepole.filt_frame(frame=SIG, coeffs=hp_onepole_coeffs)
+    # y = comb1.filt_frame(frame=SIG)
     
-    y = but1.filt_frame(frame=noise, coeffs=but_coeffs)
+    # y = but1.filt_frame(frame=noise, coeffs=but_coeffs)
     # y = but2.filt_frame(frame=y, coeffs=but_coeffs)
     
     sf.write("filt.wav", data=y, samplerate=SR, subtype="PCM_16")

@@ -57,18 +57,19 @@ impl DesignNarrowFilter {
 
 }
 
-fn _filt_sample(x: &f64, coeffs: &(f64, f64, f64, f64, f64, f64), x1: f64, x2: f64, y1: f64, y2: f64) -> (f64, f64, f64, f64) {
-    let y: f64 = coeffs.0 * x + coeffs.1 * x1 + coeffs.2 * x2 + coeffs.4 * y1 + coeffs.5 * y2;
-    (y, x1, y, y1)
+fn _filt_sample(x: &f64, coeffs: &(f64, f64, f64, f64, f64, f64), x1: f64, x2: f64, y1: f64, y2: f64) -> f64 {
+    coeffs.0 * x + coeffs.1 * x1 + coeffs.2 * x2 + coeffs.4 * y1 + coeffs.5 * y2
 }
 
 #[pyclass]
 pub struct Narrow {
     fs: f64,
-    x1: f64,
-    x2: f64,
-    y1: f64,
-    y2: f64
+    x1: Vec<f64>,
+    x2: Vec<f64>,
+    y1: Vec<f64>,
+    y2: Vec<f64>,
+    order: usize,
+    index: usize
 }
 
 #[pymethods]
@@ -83,11 +84,27 @@ impl Narrow {
     /// ----
     ///     fs: f64
     ///         sampling rate
+    ///     order: usize
+    ///         filter order
     /// 
     
-    #[pyo3(text_signature = "(fs: float) -> None")]
-    pub fn new(fs: f64) -> Self {
-        Self { fs, x1: 0.0, x2: 0.0, y1: 0.0, y2: 0.0 }
+    #[pyo3(text_signature = "(fs: float, order: int = 1) -> None")]
+    pub fn new(fs: f64, order: Option<usize>) -> Self {
+        
+        let filt_order = match order {
+            Some(order_value) => { order_value },
+            None => { 1 }
+        };
+
+        Self { 
+            fs, 
+            x1: vec![0.0; filt_order], 
+            x2: vec![0.0; filt_order], 
+            y1: vec![0.0; filt_order], 
+            y2: vec![0.0; filt_order],
+            order: filt_order,
+            index: 0 
+        }
     }
     
     ///
@@ -159,12 +176,22 @@ impl Narrow {
     #[pyo3(text_signature = "(sample: float, coeffs: tuple[float, float, float, float, float, float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: (f64, f64, f64, f64, f64, f64)) -> f64 {
 
-        let (y, _x2, _y1, _y2) = _filt_sample(&sample, &coeffs, self.x1, self.x2, self.y1, self.y2);
+        let mut x = sample;
+        let mut y: f64 = 0.0;
+        for _ in 0..self.order {
+            y = _filt_sample(&sample, &coeffs, self.x1[self.index], self.x2[self.index], self.y1[self.index], self.y2[self.index]);
 
-        self.x1 = sample;
-        self.x2 = _x2;
-        self.y1 = _y1;
-        self.y2 = _y2;
+            self.x2[self.index] = self.x1[self.index];
+            self.x1[self.index] = x;
+            self.y2[self.index] = self.y1[self.index];
+            self.y1[self.index] = y;
+
+            x = y;
+
+            self.index += 1;
+            self.index %= self.order;
+
+        }
 
         y
     }
@@ -206,10 +233,11 @@ impl Narrow {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.x1 = 0.0;
-        self.x2 = 0.0;
-        self.y1 = 0.0;
-        self.y2 = 0.0;
+        self.x1 = vec![0.0; self.order];
+        self.x2 = vec![0.0; self.order];
+        self.y1 = vec![0.0; self.order];
+        self.y2 = vec![0.0; self.order];
+        self.index = 0;
         println!("[DONE] cache cleared!")
     }
 

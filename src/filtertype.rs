@@ -1,4 +1,4 @@
-// TODO: Butterworth and Chebisev
+// TODO: Chebisev
 
 pub enum BiquadFilterType {
     Lp,
@@ -50,5 +50,6 @@ pub enum ZavalishinFilterType {
 pub enum ButterFilterType {
     Lp,
     Hp,
-    Bp
+    Bp,
+    Notch
 }

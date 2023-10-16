@@ -49,8 +49,10 @@ fn _filt_sample(x: &f64, coeffs: &(f64, f64, f64), x1: f64, y1: f64) -> f64 {
 #[pyclass]
 pub struct OnePole {
     fs: f64,
-    x: f64,
-    y: f64
+    x: Vec<f64>,
+    y: Vec<f64>,
+    order: usize,
+    index: usize
 }
 
 #[pymethods]
@@ -64,11 +66,25 @@ impl OnePole {
     /// ----
     ///     fs: f64
     ///         sampling rate
+    ///     order: usize
+    ///         filter order
     ///
     
-    #[pyo3(text_signature = "(fs: float) -> None")]
-    pub fn new(fs: f64) -> Self {
-        Self { fs, x: 0.0, y: 0.0 }
+    #[pyo3(text_signature = "(fs: float, order: int = 1) -> None")]
+    pub fn new(fs: f64, order: Option<usize>) -> Self {
+
+        let filt_order = match order {
+            Some(order_value) => { order_value }
+            None => { 1 }
+        };
+        
+        Self { 
+            fs, 
+            x: vec![0.0; filt_order], 
+            y: vec![0.0; filt_order],
+            order: filt_order,
+            index: 0
+        }
     }
 
     ///
@@ -130,9 +146,17 @@ impl OnePole {
     #[pyo3(text_signature = "(sample: float, coeffs: tuple[float, float, float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: (f64, f64, f64)) -> f64 {
 
-        let y = _filt_sample(&sample, &coeffs, self.x, self.y);
-        self.x = sample;
-        self.y = y;
+        let mut x = sample;
+        let mut y: f64 = 0.0;
+        for _ in 0..self.order {
+            y = _filt_sample(&x, &coeffs, self.x[self.index], self.y[self.index]);
+            self.x[self.index] = x;
+            self.y[self.index] = y;
+            x = y;
+            self.index += 1;
+            self.index %= self.order;
+        }
+
         y
     }
 
@@ -168,11 +192,14 @@ impl OnePole {
     ///
     /// CLEAR DELAYED SAMPLES CACHE
     /// set:
+    ///     x[n - 1] = 0.0
     ///     y[n - 1] = 0.0
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.y = 0.0;
+        self.x = vec![0.0; self.order];
+        self.y = vec![0.0; self.order];
+        self.index = 0;
         println!("[DONE] cache cleared!")
     }
 

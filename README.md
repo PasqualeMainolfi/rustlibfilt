@@ -59,7 +59,27 @@ how to use `rustlibfilt`:
         main()
     ```
 
-**Version 0.1.0**
+>Version 0.1.1
+
+1. add new filter types:  
+    *Zavalishin*:
+
+    - OnePoleZeroDelay
+    - NaiveOnePole
+    - TrapIntOnePole
+    - StateVariable
+
+    *Butter*:  
+
+    - Lp
+    - Hp
+    - Bp
+    - Notch
+
+2. now you can specify the order of the filter (only for onepole, narrow and butter)
+
+>Version 0.1.0  
+
 Filter types:  
 *Biquad*:
 
@@ -100,7 +120,7 @@ Filter types:
 - Bp
 - Notch
 
-**References**:
+>References  
 
 - V. Zavalishin, The Art of VA Filter Design, 2018
 - Audio EQ Cookbook by Robert Bristow-Johnson, <https://www.musicdsp.org/en/latest/Filters/197-rbj-audio-eq-cookbook.html>  
