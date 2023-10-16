@@ -53,3 +53,14 @@ pub enum ButterFilterType {
     Bp,
     Notch
 }
+
+pub enum FilterType {
+    BiquadType(BiquadFilterType),
+    TwoZeroTwoPoleType(TwoZeroTwoPoleFilterType),
+    HarmonicType(HarmonicFilterType),
+    OnePoleType(OnePoleFilterType),
+    DcBlockType(DcBlockFilterType),
+    NarrowType(NarrowFilterType),
+    ZavalishinType(ZavalishinFilterType),
+    ButterType(ButterFilterType)
+}

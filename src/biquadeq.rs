@@ -2,10 +2,10 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::{filtertype::BiquadFilterType, coeffstruct::BiquadCoeffs};
+use super::{filtertype::{FilterType, BiquadFilterType}, coeffstruct::BiquadCoeffs};
 
 struct DesignBiquadFilter {
-    mode: BiquadFilterType,
+    mode: FilterType,
     filt_coeffs: BiquadCoeffs,
     theta_sine: f64,
     theta_cosine: f64,
@@ -15,7 +15,7 @@ struct DesignBiquadFilter {
 }
 
 impl DesignBiquadFilter {
-    fn new(mode: BiquadFilterType, fc: f64, fs: f64, q: f64, dbgain: Option<f64>) -> Self {
+    fn new(mode: FilterType, fc: f64, fs: f64, q: f64, dbgain: Option<f64>) -> Self {
         const TWOPI: f64 = 2.0 * std::f64::consts::PI;
         let filt_coeffs = BiquadCoeffs::new();
         let w = TWOPI * fc / fs;
@@ -46,7 +46,7 @@ impl DesignBiquadFilter {
 
     fn coeffs(&mut self) {
         match self.mode {
-            BiquadFilterType::Lp => {
+            FilterType::BiquadType(BiquadFilterType::Lp) => {
                 let c = 1.0 - self.theta_cosine;
                 let b0: f64 = c / 2.0;
                 let b1: f64 = c;
@@ -58,7 +58,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Hp => {
+            FilterType::BiquadType(BiquadFilterType::Hp) => {
                 let c = 1.0 + self.theta_cosine;
                 let b0: f64 = c / 2.0;
                 let b1: f64 = -c;
@@ -70,7 +70,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Bp0dB => {
+            FilterType::BiquadType(BiquadFilterType::Bp0dB) => {
                 let b0: f64 = self.alpha;
                 let b1: f64 = 0.0;
                 let b2: f64 = -b0;
@@ -81,7 +81,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Bpsg => {
+            FilterType::BiquadType(BiquadFilterType::Bpsg) => {
                 let b0: f64 = self.theta_sine / 2.0;
                 let b1: f64 = 0.0;
                 let b2: f64 = -b0;
@@ -92,7 +92,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Notch => {
+            FilterType::BiquadType(BiquadFilterType::Notch) => {
                 let b0: f64 = 1.0;
                 let b1: f64 = -2.0 * self.theta_cosine;
                 let b2: f64 = b0;
@@ -103,7 +103,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Ap => {
+            FilterType::BiquadType(BiquadFilterType::Ap) => {
                 let b0: f64 = 1.0 - self.alpha;
                 let b1: f64 = -2.0 * self.theta_cosine;
                 let b2: f64 = 1.0 + self.alpha;
@@ -114,7 +114,7 @@ impl DesignBiquadFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, a0, a1, a2))
             },
-            BiquadFilterType::Peq => {
+            FilterType::BiquadType(BiquadFilterType::Peq) => {
                 match self.a {
                     Some(a_value) => { 
                         let b0: f64 = 1.0 + self.alpha * a_value;
@@ -133,7 +133,7 @@ impl DesignBiquadFilter {
                     }
                 }
             },
-            BiquadFilterType::LpShelf => {
+            FilterType::BiquadType(BiquadFilterType::LpShelf) => {
                 match (self.a, self.beta) {
                     (Some(a_value), Some(beta_value)) => {
                         let b0: f64 = a_value * ((a_value + 1.0) - (a_value - 1.0) * self.theta_cosine + beta_value * self.theta_sine);
@@ -152,7 +152,7 @@ impl DesignBiquadFilter {
                     }
                 }
             },
-            BiquadFilterType::HpShelf => {
+            FilterType::BiquadType(BiquadFilterType::HpShelf) => {
                 match (self.a, self.beta) {
                     (Some(a_value), Some(beta_value)) => {
                         let b0: f64 = a_value * ((a_value + 1.0) + (a_value - 1.0) * self.theta_cosine + beta_value * self.theta_sine);
@@ -170,7 +170,8 @@ impl DesignBiquadFilter {
                         self.filt_coeffs.set_coeffs((0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
                     }
                 }
-            }
+            },
+            _ => {}
         }
         
     }
@@ -252,16 +253,16 @@ impl Biquad {
     #[pyo3(text_signature = "(mode: str, fc: float, q: float, dbgain: float|None) -> tuple[float, float, float, float, float, float]")]
     pub fn design_filter(&self, mode: &str, fc: f64, q: f64, dbgain: Option<f64>) -> (f64, f64, f64, f64, f64, f64) {
 
-        let filt_type: BiquadFilterType = match mode {
-            "lp" => BiquadFilterType::Lp,
-            "hp" => BiquadFilterType::Hp,
-            "bp0db" => BiquadFilterType::Bp0dB,
-            "bpsg" => BiquadFilterType::Bpsg,
-            "notch" => BiquadFilterType::Notch,
-            "ap" => BiquadFilterType::Ap,
-            "peq" => BiquadFilterType::Peq,
-            "lps" => BiquadFilterType::LpShelf,
-            "hps" => BiquadFilterType::HpShelf,
+        let filt_type: FilterType = match mode {
+            "lp" => FilterType::BiquadType(BiquadFilterType::Lp),
+            "hp" => FilterType::BiquadType(BiquadFilterType::Hp),
+            "bp0db" => FilterType::BiquadType(BiquadFilterType::Bp0dB),
+            "bpsg" => FilterType::BiquadType(BiquadFilterType::Bpsg),
+            "notch" => FilterType::BiquadType(BiquadFilterType::Notch),
+            "ap" => FilterType::BiquadType(BiquadFilterType::Ap),
+            "peq" => FilterType::BiquadType(BiquadFilterType::Peq),
+            "lps" => FilterType::BiquadType(BiquadFilterType::LpShelf),
+            "hps" => FilterType::BiquadType(BiquadFilterType::HpShelf),
             _ => {
                 println!("[ERROR] Filt mode not allowed!");
                 std::process::exit(1)

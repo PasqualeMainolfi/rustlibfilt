@@ -9,7 +9,6 @@ import numpy as np
 PATH = "./audio_files/vox.wav"
 SIG, SR = lb.load(PATH, sr=None)
 
-
 # main function
 def main() -> None:
     bq = Biquad(fs=SR)

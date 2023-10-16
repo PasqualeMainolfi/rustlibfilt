@@ -1,17 +1,17 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::OnePoleFilterType, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, OnePoleFilterType}, coeffstruct::OnePoleCoeffs};
 use pyo3::prelude::*;
 
 pub struct DesignOnePoleFilter {
-    mode: OnePoleFilterType,
+    mode: FilterType,
     pub filt_coeffs: OnePoleCoeffs,
     alpha: f64
 }
 
 impl DesignOnePoleFilter {
-    pub fn new(mode: OnePoleFilterType, fc: f64, fs: f64) -> Self {
+    pub fn new(mode: FilterType, fc: f64, fs: f64) -> Self {
         let filt_coeffs = OnePoleCoeffs::new();
         let twopi = 2.0 * std::f64::consts::PI;
         let w = twopi * fc / fs;
@@ -26,17 +26,18 @@ impl DesignOnePoleFilter {
 
     pub fn coeffs(&mut self) {
         match self.mode {
-            OnePoleFilterType::LowPass => {
+            FilterType::OnePoleType(OnePoleFilterType::LowPass) => {
                 let b0 = 1.0 - self.alpha;
                 let a1 = self.alpha;
                 self.filt_coeffs.set_coeffs((b0, 0.0, a1));
             },
-            OnePoleFilterType::HighPass => {
+            FilterType::OnePoleType(OnePoleFilterType::HighPass) => {
                 let b0 = (1.0 + self.alpha) / 2.0;
                 let b1 = -b0;
                 let a1 = self.alpha;
                 self.filt_coeffs.set_coeffs((b0, b1, a1));
-            }
+            },
+            _ => {}
         }
     } 
 
@@ -110,9 +111,9 @@ impl OnePole {
     #[pyo3(text_signature = "(mode: str, fc: float) -> tuple[float, float, float]")]
     pub fn design_filter(&mut self, mode: &str, fc: f64) -> (f64, f64, f64) {
 
-        let filt_type: OnePoleFilterType = match mode {
-            "lp" => OnePoleFilterType::LowPass,
-            "hp" => OnePoleFilterType::HighPass,
+        let filt_type: FilterType = match mode {
+            "lp" => FilterType::OnePoleType(OnePoleFilterType::LowPass),
+            "hp" => FilterType::OnePoleType(OnePoleFilterType::HighPass),
             _ => {
                 println!("[ERROR] Filt mode not allowed!");
                 std::process::exit(1)

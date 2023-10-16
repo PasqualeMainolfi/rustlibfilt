@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::filtertype::ZavalishinFilterType;
+use super::filtertype::{FilterType, ZavalishinFilterType};
 
 fn filt_sample(sample: &f64, g: f64, _z: f64) -> (f64, f64, f64) {
     let v = (sample - _z) * g;
@@ -29,7 +29,7 @@ pub struct Zavalishin {
     r: f64,
     z_sample: f64,
     s_sample: f64,
-    filt_type: Option<ZavalishinFilterType>
+    filt_type: Option<FilterType>
 }
 
 #[pymethods]
@@ -84,21 +84,21 @@ impl Zavalishin {
         let mut wa = (2.0 / ts) * (wc * ts / 2.0).tan();
         match mode {
             "zdf" => { 
-                self.filt_type = Some(ZavalishinFilterType::OnePoleZeroDelay);
+                self.filt_type = Some(FilterType::ZavalishinType(ZavalishinFilterType::OnePoleZeroDelay));
                 self.g = wa * ts / 2.0
             },
             "naive" => { 
-                self.filt_type = Some(ZavalishinFilterType::NaiveOnePole);
+                self.filt_type = Some(FilterType::ZavalishinType(ZavalishinFilterType::NaiveOnePole));
                 self.g = wa * ts
             },
             "trap" => { 
-                self.filt_type = Some(ZavalishinFilterType::TrapIntOnePole);
+                self.filt_type = Some(FilterType::ZavalishinType(ZavalishinFilterType::TrapIntOnePole));
                 self.g = wa * ts / 2.0
             },
             "svf" => { 
                 match fc_spread {
                     Some(spread) => {
-                        self.filt_type = Some(ZavalishinFilterType::StateVariable);
+                        self.filt_type = Some(FilterType::ZavalishinType(ZavalishinFilterType::StateVariable));
                         let w = twopi * (fc + spread);
                         let w_sqrt = (wc * w).sqrt();
                         self.r = ((wc + w) / 2.0) / w_sqrt;
@@ -138,33 +138,36 @@ impl Zavalishin {
     pub fn filt_sample(&mut self, sample: f64) -> (f64, f64, f64, f64, f64) {
         let (lp, hp, ap, bp, br, z, s) = match &self.filt_type {
             Some(t) => { match t {
-                ZavalishinFilterType::OnePoleZeroDelay => {
+                FilterType::ZavalishinType(ZavalishinFilterType::OnePoleZeroDelay) => {
                     let (_lp, _hp, _z) = filt_sample(&sample, self.g, self.z_sample);
                     let _ap = _lp - _hp;
                     (_lp, _hp, _ap, 0.0, 0.0, _z, 0.0)
                 },
-                ZavalishinFilterType::NaiveOnePole => {
+                FilterType::ZavalishinType(ZavalishinFilterType::NaiveOnePole) => {
                     let (_lp, _hp, _z) = filt_sample(&sample, self.g, self.z_sample);
                     (_lp, _hp / 2.0, 0.0, 0.0, 0.0, _lp, 0.0)
                 },
-                ZavalishinFilterType::TrapIntOnePole => {
+                FilterType::ZavalishinType(ZavalishinFilterType::TrapIntOnePole) => {
                     let (_lp, _hp, _z) = filt_sample(&sample, self.g, self.z_sample);
                     (_lp, _hp, 0.0, 0.0, 0.0, _z, 0.0)
                 },
-                ZavalishinFilterType::StateVariable => {
+                FilterType::ZavalishinType(ZavalishinFilterType::StateVariable) => {
                     let (_lp, _hp, _bp, _br) = filt_sample_svf(&sample, (self.g, self.g1, self.r), self.z_sample, self.s_sample);
                     let _z = self.g * _hp + _bp;
                     let _s = self.g * _bp + _lp;
                     (_lp, _hp, 0.0, _bp, _br, _z, _s)
                     
                 },
+                _ => { (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) }
             }
         },
             None => (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         };
+
         self.z_sample = z;
         self.s_sample = s;
         (lp, hp, ap, bp, br)
+        
     }
 
     ///

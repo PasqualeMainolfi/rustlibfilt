@@ -2,10 +2,10 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::{filtertype::NarrowFilterType, coeffstruct::BiquadCoeffs};
+use super::{filtertype::{FilterType, NarrowFilterType}, coeffstruct::BiquadCoeffs};
 
 struct DesignNarrowFilter {
-    mode: NarrowFilterType,
+    mode: FilterType,
     filt_coeffs: BiquadCoeffs,
     theta_cosine: f64,
     k: f64,
@@ -13,7 +13,7 @@ struct DesignNarrowFilter {
 }
 
 impl DesignNarrowFilter {
-    fn new(mode: NarrowFilterType, fc: f64, fs: f64, bw: f64) -> Self {
+    fn new(mode: FilterType, fc: f64, fs: f64, bw: f64) -> Self {
         const TWOPI: f64 = 2.0 * std::f64::consts::PI;
         let filt_coeffs = BiquadCoeffs::new();
         let w = TWOPI * fc / fs;
@@ -32,7 +32,7 @@ impl DesignNarrowFilter {
 
     fn coeffs(&mut self) {
         match self.mode {
-            NarrowFilterType::Bp => {
+            FilterType::NarrowType(NarrowFilterType::Bp) => {
                 let b0: f64 = 1.0 - self.k;
                 let b1: f64 = 2.0 * (self.k - self.r) * self.theta_cosine;
                 let b2: f64 = self.r.powf(2.0) - self.k;
@@ -42,7 +42,7 @@ impl DesignNarrowFilter {
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, 1.0, a1, a2))
             },
-            NarrowFilterType::Notch => {
+            FilterType::NarrowType(NarrowFilterType::Notch) => {
                 let b0: f64 = self.k;
                 let b1: f64 = -2.0 * self.k * self.theta_cosine;
                 let b2: f64 = self.k;
@@ -51,7 +51,8 @@ impl DesignNarrowFilter {
                 let a2: f64 = -self.r.powf(2.0);
 
                 self.filt_coeffs.set_coeffs((b0, b1, b2, 1.0, a1, a2))
-            }
+            },
+            _ => {}
         }
     }
 
@@ -132,9 +133,9 @@ impl Narrow {
     #[pyo3(text_signature = "(mode: str, fc: float, bw: float) -> tuple[float, float, float, float, float, float]")]
     pub fn design_filter(&self, mode: &str, fc: f64, bw: f64) -> (f64, f64, f64, f64, f64, f64) {
 
-        let filt_type: NarrowFilterType = match mode {
-            "bp" => NarrowFilterType::Bp,
-            "notch" => NarrowFilterType::Notch,
+        let filt_type: FilterType = match mode {
+            "bp" => FilterType::NarrowType(NarrowFilterType::Bp),
+            "notch" => FilterType::NarrowType(NarrowFilterType::Notch),
             _ => {
                 println!("[ERROR] Filt mode not allowed!");
                 std::process::exit(1)

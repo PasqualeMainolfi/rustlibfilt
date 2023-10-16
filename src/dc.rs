@@ -1,22 +1,23 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::single_match)]
 
-use super::{filtertype::DcBlockFilterType, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, DcBlockFilterType}, coeffstruct::OnePoleCoeffs};
 use pyo3::prelude::*;
 
 struct DesignDcFilter {
-    mode: DcBlockFilterType,
+    mode: FilterType,
     filt_coeffs: OnePoleCoeffs,
     r: f64
 }
 
 impl DesignDcFilter {
-    fn new(mode: DcBlockFilterType, fc: f64, fs: f64) -> Self {
+    fn new(mode: FilterType, fc: f64, fs: f64) -> Self {
         let filt_coeffs = OnePoleCoeffs::new();
         let twopi = 2.0 * std::f64::consts::PI;
         let w = twopi * fc / fs;
         let r = 1.0 - w;
-
+        
         Self {
             mode,
             filt_coeffs,
@@ -26,11 +27,13 @@ impl DesignDcFilter {
 
     fn coeffs(&mut self) {
         match self.mode {
-            DcBlockFilterType::DcBlockJulius => {
-                self.filt_coeffs.set_coeffs((1.0, 0.0, self.r));
-            }
+            FilterType::DcBlockType(DcBlockFilterType::DcBlockJulius) => {
+                self.filt_coeffs.set_coeffs((1.0, 0.0, self.r))
+
+            },
+            _ => {}
         }
-    } 
+    }
 
 }
 
@@ -82,8 +85,8 @@ impl DcFilter {
     #[pyo3(text_signature = "(mode: str, fc: float) -> tuple[float, float]")]
     pub fn design_filter(&mut self, mode: &str, fc: f64) -> (f64, f64) {
 
-        let filt_type: DcBlockFilterType = match mode {
-            "dcj" => DcBlockFilterType::DcBlockJulius,
+        let filt_type: FilterType = match mode {
+            "dcj" => FilterType::DcBlockType(DcBlockFilterType::DcBlockJulius),
             _ => {
                 println!("[ERROR] Filt mode not allowed!");
                 std::process::exit(1)

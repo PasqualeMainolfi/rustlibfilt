@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::{coeffstruct::OnePoleCoeffs, filtertype::ButterFilterType};
+use super::{coeffstruct::OnePoleCoeffs, filtertype::{FilterType, ButterFilterType}};
 
 struct DesignButterFilter {
     filt_coeffs: OnePoleCoeffs,
@@ -16,28 +16,27 @@ impl DesignButterFilter {
         }
     }
 
-    fn coeffs(&mut self, mode: ButterFilterType, fc: f64, fs: f64) {
+    fn coeffs(&mut self, mode: FilterType, fc: f64, fs: f64) {
         let twopi = 2.0 * std::f64::consts::PI;
         let wc = twopi * fc;
         let ts = 1.0 / fs;
         let wtan = 2.0 * (wc * ts / 2.0).tan();
         match mode {
-            ButterFilterType::Lp => {
+            FilterType::ButterType(ButterFilterType::Lp) => {
                 let b0 = wtan / (2.0 + wtan);
                 let b1 = b0;
                 let a1 = (wtan - 2.0) / (2.0 + wtan);
 
                 self.filt_coeffs.set_coeffs((b0, b1, a1))
             },
-            ButterFilterType::Hp => {
+            FilterType::ButterType(ButterFilterType::Hp) => {
                 let b0 = 2.0 / (2.0 + wtan);
                 let b1 = -b0;
                 let a1 = (wtan - 2.0) / (2.0 + wtan);
 
                 self.filt_coeffs.set_coeffs((b0, b1, a1))
             },
-            ButterFilterType::Bp => {},
-            ButterFilterType::Notch => {},
+            _ => {}
         }
     }
 }
@@ -118,7 +117,7 @@ impl Butter {
 
         let coeffs = match mode {
             "lp" => { 
-                design_filter.coeffs(ButterFilterType::Lp, fc, self.fs);
+                design_filter.coeffs(FilterType::ButterType(ButterFilterType::Lp), fc, self.fs);
                 let b0 = design_filter.filt_coeffs.b0; 
                 let b1 = design_filter.filt_coeffs.b1;
                 let a1 = design_filter.filt_coeffs.a1;
@@ -126,7 +125,7 @@ impl Butter {
                 vec![b0, b1, a1]
             },
             "hp" => {
-                design_filter.coeffs(ButterFilterType::Hp, fc, self.fs);
+                design_filter.coeffs(FilterType::ButterType(ButterFilterType::Hp), fc, self.fs);
                 let b0 = design_filter.filt_coeffs.b0; 
                 let b1 = design_filter.filt_coeffs.b1;
                 let a1 = design_filter.filt_coeffs.a1;
@@ -136,12 +135,12 @@ impl Butter {
             "bp" => { 
                 match bw { 
                     Some(bw_value) => { 
-                        design_filter.coeffs(ButterFilterType::Lp, fc + bw_value / 2.0, self.fs);
+                        design_filter.coeffs(FilterType::ButterType(ButterFilterType::Lp), fc + bw_value / 2.0, self.fs);
                         let b0lp = design_filter.filt_coeffs.b0; 
                         let b1lp = design_filter.filt_coeffs.b1;
                         let a1lp = design_filter.filt_coeffs.a1;
         
-                        design_filter.coeffs(ButterFilterType::Hp, fc - bw_value / 2.0, self.fs);
+                        design_filter.coeffs(FilterType::ButterType(ButterFilterType::Hp), fc - bw_value / 2.0, self.fs);
                         let b0hp = design_filter.filt_coeffs.b0; 
                         let b1hp = design_filter.filt_coeffs.b1;
                         let a1hp = design_filter.filt_coeffs.a1;
@@ -158,12 +157,12 @@ impl Butter {
             "br" => { 
                 match bw { 
                     Some(bw_value) => { 
-                        design_filter.coeffs(ButterFilterType::Lp, fc - bw_value / 2.0, self.fs);
+                        design_filter.coeffs(FilterType::ButterType(ButterFilterType::Lp), fc - bw_value / 2.0, self.fs);
                         let b0lp = design_filter.filt_coeffs.b0; 
                         let b1lp = design_filter.filt_coeffs.b1;
                         let a1lp = design_filter.filt_coeffs.a1;
         
-                        design_filter.coeffs(ButterFilterType::Hp, fc + bw_value / 2.0, self.fs);
+                        design_filter.coeffs(FilterType::ButterType(ButterFilterType::Hp), fc + bw_value / 2.0, self.fs);
                         let b0hp = design_filter.filt_coeffs.b0; 
                         let b1hp = design_filter.filt_coeffs.b1;
                         let a1hp = design_filter.filt_coeffs.a1;

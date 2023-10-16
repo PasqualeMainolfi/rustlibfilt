@@ -1,7 +1,7 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::OnePoleFilterType, onepole::DesignOnePoleFilter, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, OnePoleFilterType}, onepole::DesignOnePoleFilter, coeffstruct::OnePoleCoeffs};
 use pyo3::prelude::*;
 
 fn _filt_sample_lowpass(x: &f64, coeffs: &(f64, f64), y1: f64) -> f64 {
@@ -121,7 +121,7 @@ impl Harmonic {
 
         let (b0, a1) = match fc {
             Some(cutoff) => {
-                let mut lowpass_coeffs = DesignOnePoleFilter::new(OnePoleFilterType::LowPass, cutoff, self.fs);
+                let mut lowpass_coeffs = DesignOnePoleFilter::new(FilterType::OnePoleType(OnePoleFilterType::LowPass), cutoff, self.fs);
                 lowpass_coeffs.coeffs();
                 (lowpass_coeffs.filt_coeffs.b0, lowpass_coeffs.filt_coeffs.a1)
             },

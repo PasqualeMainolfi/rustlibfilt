@@ -1,18 +1,18 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::TwoZeroTwoPoleFilterType, coeffstruct::BiquadCoeffs};
+use super::{filtertype::{FilterType, TwoZeroTwoPoleFilterType}, coeffstruct::BiquadCoeffs};
 use pyo3::prelude::*;
 
 struct DesignTwoPoleTwoZeroFilter {
-    mode: TwoZeroTwoPoleFilterType,
+    mode: FilterType,
     filt_coeffs: BiquadCoeffs,
     theta_cosine: f64,
     r: f64
 }
 
 impl DesignTwoPoleTwoZeroFilter {
-    fn new(mode: TwoZeroTwoPoleFilterType, fc: f64, fs: f64, bw: f64) -> Self {
+    fn new(mode: FilterType, fc: f64, fs: f64, bw: f64) -> Self {
 
         let pi = std::f64::consts::PI;
         let filt_coeffs = BiquadCoeffs::new();
@@ -29,7 +29,7 @@ impl DesignTwoPoleTwoZeroFilter {
 
     fn coeffs(&mut self) {
         match self.mode {
-            TwoZeroTwoPoleFilterType::Notch => {
+            FilterType::TwoZeroTwoPoleType(TwoZeroTwoPoleFilterType::Notch) => {
                 let b0 = 1.0;
                 let b1 = -2.0 * self.r * self.theta_cosine;
                 let b2 = self.r * self.r;
@@ -37,14 +37,15 @@ impl DesignTwoPoleTwoZeroFilter {
                 self.filt_coeffs.set_coeffs((b0, b1, b2, 0.0, 0.0, 0.0))
 
             },
-            TwoZeroTwoPoleFilterType::Bp => {
+            FilterType::TwoZeroTwoPoleType(TwoZeroTwoPoleFilterType::Bp) => {
                 let b0 = 1.0;
                 let a1 = -2.0 * self.r * self.theta_cosine;
                 let a2 = self.r * self.r;
 
                 self.filt_coeffs.set_coeffs((b0, 0.0, 0.0, 0.0, a1, a2))
 
-            }
+            },
+            _ => {}
             
         }
     }
@@ -108,8 +109,8 @@ impl TwoZeroTwoPole {
     pub fn design_filter(&mut self, mode: &str, fc: f64, bw: f64) -> (f64, f64, f64, f64, f64, f64) {
 
         let filt_type = match mode {
-            "notch" => TwoZeroTwoPoleFilterType::Notch,
-            "bp" => TwoZeroTwoPoleFilterType::Bp,
+            "notch" => FilterType::TwoZeroTwoPoleType(TwoZeroTwoPoleFilterType::Notch),
+            "bp" => FilterType::TwoZeroTwoPoleType(TwoZeroTwoPoleFilterType::Bp),
             _ => {
                 println!("[ERROR] Filt mode not allowed!");
                 std::process::exit(1)
