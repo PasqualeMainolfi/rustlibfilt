@@ -114,7 +114,7 @@ impl Harmonic {
     ///         low pass cut off frequency (optional, only for lpcombi and lpallpass)
     ///
 
-    #[pyo3(text_signature = "(t60: float, fs: float, fc: float|None) -> None")]
+    #[pyo3(text_signature = "(t60: float, fc: float|None) -> None")]
     pub fn design_filter(&mut self, t60: f64, fc: Option<f64>) {
         let d_time: f64 = (self.buffer_delay as f64) / self.fs;
         self.g = 10.0_f64.powf(-3.0 * d_time / t60);
