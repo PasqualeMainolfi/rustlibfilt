@@ -4,8 +4,9 @@ import numpy as np
 import soundfile as sf
 
 
-
 # main scripts
+print(help(Rustlibfilt))
+
 SR = 44100
 NOISE = np.random.uniform(-1, 1, SR)
 N = len(NOISE)
