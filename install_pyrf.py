@@ -1,7 +1,6 @@
 # import section
 import subprocess
 import os
-import sys
 
 # main scripts
 CWD = os.getcwd()
