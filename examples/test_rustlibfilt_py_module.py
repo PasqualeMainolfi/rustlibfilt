@@ -22,7 +22,6 @@ def main() -> None:
     cb.design_filter(t60=.7)
     print(1/0.0034)
     
-    
     y = np.zeros(N)
     for i in range(N):
         y[i] = bq.filt_sample(sample=NOISE[i])
