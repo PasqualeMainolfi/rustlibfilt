@@ -1,7 +1,7 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::{FilterType, TwoZeroTwoPoleFilterType}, coeffstruct::BiquadCoeffs};
+use super::{filtertype::{FilterType, TwoZeroTwoPoleFilterType}, coeffstruct::BiquadCoeffs, delayline::DelayLine};
 use pyo3::prelude::*;
 
 struct DesignTwoPoleTwoZeroFilter {
@@ -51,18 +51,14 @@ impl DesignTwoPoleTwoZeroFilter {
     }
 }
 
-fn filt_sample(x: &f64, coeffs: &(f64, f64, f64, f64, f64, f64), x1: f64, x2: f64, y1: f64, y2: f64) -> (f64, f64, f64) {
-    let y: f64 = coeffs.0 * x + coeffs.1 * x1 + coeffs.2 * x2 - coeffs.4 * y1 - coeffs.5 * y2;
-    (y, x1, y1)
-}
 
 #[pyclass]
 pub struct TwoZeroTwoPole {
     fs: f64,
-    x1: f64,
-    x2: f64,
-    y1: f64,
-    y2: f64
+    x1: DelayLine,
+    x2: DelayLine,
+    y1: DelayLine,
+    y2: DelayLine
 }
 
 #[pymethods]
@@ -80,7 +76,13 @@ impl TwoZeroTwoPole {
     
     #[pyo3(text_signature = "(fs: float) -> None")]
     pub fn new(fs: f64) -> Self { 
-        Self { fs, x1: 0.0, x2: 0.0, y1: 0.0, y2: 0.0 }
+        Self { 
+            fs, 
+            x1: DelayLine::new(1), 
+            x2: DelayLine::new(2), 
+            y1: DelayLine::new(1), 
+            y2: DelayLine::new(2) 
+        }
     }
 
     ///
@@ -144,12 +146,12 @@ impl TwoZeroTwoPole {
     #[pyo3(text_signature = "(sample: float, coeffs: tuple[float, float, float, float, float, float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: (f64, f64, f64, f64, f64, f64)) -> f64 {
 
-        let (y, x2, y2) = filt_sample(&sample, &coeffs, self.x1, self.x2, self.y1, self.y2);
+        let y = coeffs.0 * sample + coeffs.1 * self.x1.read() + coeffs.2 * self.x2.read() - coeffs.4 * self.y1.read() - coeffs.5 * self.y2.read();
 
-        self.x1 = sample;
-        self.x2 = x2;
-        self.y1 = y;
-        self.y2 = y2;
+        self.x1.write_and_advance(&sample);
+        self.x2.write_and_advance(&sample);
+        self.y1.write_and_advance(&y);
+        self.y2.write_and_advance(&y);
 
         y
     }
@@ -194,10 +196,10 @@ impl TwoZeroTwoPole {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.x1 = 0.0;
-        self.x2 = 0.0;
-        self.y1 = 0.0;
-        self.y2 = 0.0;
+        self.x1.clear();
+        self.x2.clear();
+        self.y1.clear();
+        self.y2.clear();
         println!("[DONE] cache cleared!")
     }
 }

@@ -1,7 +1,7 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::{FilterType, OnePoleFilterType}, onepole::DesignOnePoleFilter, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, OnePoleFilterType}, onepole::DesignOnePoleFilter, coeffstruct::OnePoleCoeffs, delayline::DelayLine};
 use pyo3::prelude::*;
 
 fn _filt_sample_lowpass(x: &f64, coeffs: &(f64, f64), y1: f64) -> f64 {
@@ -49,10 +49,9 @@ pub struct Harmonic {
     buffer_delay: usize,
     mode: String,
     g: f64,
-    x: Vec<f64>,
-    y: Vec<f64>,
-    index: usize,
-    ylp: f64,
+    x: DelayLine,
+    y: DelayLine,
+    ylp: DelayLine,
     low_pass_coeffs: OnePoleCoeffs
 }
 
@@ -83,22 +82,17 @@ impl Harmonic {
     #[pyo3(text_signature = "(mode: str, buffer_delay: int, fs: float) -> None")]
     pub fn new(mode: &str, buffer_delay: usize, fs: f64) -> Self {
         let mode = String::from(mode);
-        let x = vec![0.0; buffer_delay];
-        let y = vec![0.0; buffer_delay];
         let g = 0.0;
         let low_pass_coeffs = OnePoleCoeffs::new();
-        let ylp = 0.0;
-        let index = 0;
 
         Self {
             fs,
             buffer_delay,
             mode,
             g,
-            x,
-            y,
-            index,
-            ylp,
+            x: DelayLine::new(buffer_delay),
+            y: DelayLine::new(buffer_delay),
+            ylp: DelayLine::new(1),
             low_pass_coeffs
         }
     }
@@ -150,17 +144,17 @@ impl Harmonic {
         let lp_coeffs = (self.low_pass_coeffs.b0, self.low_pass_coeffs.a1);
         
         let (yout, ylpass) = match &self.mode[..] {
-            "combf" => { (_filt_sample_comb("fir", &sample, &self.g, self.x[self.index]), 0.0) },
-            "combfreev" => { (_filt_sample_comb("fir_freev", &sample, &self.g, self.x[self.index]), 0.0) },
-            "combi" => { (_filt_sample_comb("iir", &sample, &self.g, self.y[self.index]), 0.0) },
-            "allpass" => { (_filt_sample_allpass("naive", &sample, &self.g, self.x[self.index], self.y[self.index]), 0.0) },
-            "allpassfreev" => { (_filt_sample_allpass("freev", &sample, &self.g, self.x[self.index], self.y[self.index]), 0.0) },
+            "combf" => { (_filt_sample_comb("fir", &sample, &self.g, self.x.read()), 0.0) },
+            "combfreev" => { (_filt_sample_comb("fir_freev", &sample, &self.g, self.x.read()), 0.0) },
+            "combi" => { (_filt_sample_comb("iir", &sample, &self.g, self.y.read()), 0.0) },
+            "allpass" => { (_filt_sample_allpass("naive", &sample, &self.g, self.x.read(), self.y.read()), 0.0) },
+            "allpassfreev" => { (_filt_sample_allpass("freev", &sample, &self.g, self.x.read(), self.y.read()), 0.0) },
             "lpcombi" => {
-                let (y_out, y_out_lp) = _filt_sample_comb_lp(&sample, &self.g, &lp_coeffs, self.y[self.index], self.ylp);
+                let (y_out, y_out_lp) = _filt_sample_comb_lp(&sample, &self.g, &lp_coeffs, self.y.read(), self.ylp.read());
                 (y_out, y_out_lp)
             },
             "lpallpass" => {
-                let (y_out, y_out_lp) = _filt_sample_allpass_lp(&sample, &self.g, &lp_coeffs, self.x[self.index], self.y[self.index], self.ylp);
+                let (y_out, y_out_lp) = _filt_sample_allpass_lp(&sample, &self.g, &lp_coeffs, self.x.read(), self.y.read(), self.ylp.read());
                 (y_out, y_out_lp)
             },
             _ => {
@@ -169,13 +163,11 @@ impl Harmonic {
             }
         };
         
-        self.ylp = ylpass;
+        self.ylp.write_and_advance(&ylpass);
 
-        self.x[self.index] = sample;
-        self.y[self.index] = yout;
+        self.x.write_and_advance(&sample);
+        self.y.write_and_advance(&yout);
 
-        self.index += 1;
-        self.index %= self.buffer_delay;
         yout
 
     }
@@ -212,13 +204,9 @@ impl Harmonic {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-
-        for (x, y) in self.x.iter_mut().zip(self.y.iter_mut()) {
-            *x = 0.0;
-            *y = 0.0;
-        };
-
-        self.ylp = 0.0;
+        self.x.clear();
+        self.y.clear();
+        self.ylp.clear();
         println!("[DONE] cache cleared!")
     }
 }

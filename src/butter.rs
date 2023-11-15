@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::{coeffstruct::OnePoleCoeffs, filtertype::{FilterType, ButterFilterType}};
+use super::{coeffstruct::OnePoleCoeffs, filtertype::{FilterType, ButterFilterType}, delayline::DelayLine};
 
 struct DesignButterFilter {
     filt_coeffs: OnePoleCoeffs,
@@ -41,20 +41,16 @@ impl DesignButterFilter {
     }
 }
 
-fn _filt_sample(sample: &f64, coeffs: &[f64], x1: f64, y1: f64) -> f64 {
-    coeffs[0] * sample + coeffs[1] * x1 - coeffs[2] * y1
-}
 
 #[pyclass]
 pub struct Butter {
     mode: String,
     fs: f64,
     order: usize,
-    xtemp: Vec<f64>,
-    ytemp: Vec<f64>,
-    x1: Vec<f64>,
-    y1: Vec<f64>,
-    index: usize
+    xtemp: DelayLine,
+    ytemp: DelayLine,
+    x1: DelayLine,
+    y1: DelayLine,
 }
 
 #[pymethods]
@@ -83,11 +79,10 @@ impl Butter {
             mode: String::from(""), 
             fs, 
             order: filt_order, 
-            xtemp: vec![0.0; filt_order], 
-            ytemp: vec![0.0; filt_order], 
-            x1: vec![0.0; filt_order], 
-            y1: vec![0.0; filt_order],
-            index: 0
+            xtemp: DelayLine::new(filt_order), 
+            ytemp: DelayLine::new(filt_order), 
+            x1: DelayLine::new(filt_order), 
+            y1: DelayLine::new(filt_order),
         }
     }
 
@@ -207,60 +202,39 @@ impl Butter {
     #[pyo3(text_signature = "(sample: float, coeffs: list[float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: Vec<f64>) -> f64 {
 
-        // let (y, xtemp, ytemp, x1, y1) = if self.mode.eq("bp") {
-        //     let _ytemp = _filt_sample(&sample, &coeffs[0..3], self.xtemp, self.ytemp);
-        //     let _y = _filt_sample(&_ytemp, &coeffs[3..6], self.x1, self.y1);
-        //     (_y, sample, _ytemp, _ytemp, _y)
-        // } else if self.mode.eq("br") {
-        //     let _ylp = _filt_sample(&sample, &coeffs[0..3], self.xtemp, self.ytemp);
-        //     let _yhp = _filt_sample(&sample, &coeffs[3..6], self.x1, self.y1);
-        //     let _y = _ylp + _yhp;
-        //     (_y, sample, _ylp, sample, _yhp)
-        // } else {
-        //     let _y = _filt_sample(&sample, &coeffs, self.x1, self.y1);
-        //     (_y, 0.0, 0.0, sample, _y)
-        // };
-
-
         let mut x1 = sample;
         let mut x2 = sample;
         let mut y: f64 = 0.0;
         
         if self.mode.eq("bp") {
             for _ in 0..self.order {
-                let _ytemp = _filt_sample(&x1, &coeffs[0..3], self.xtemp[self.index], self.ytemp[self.index]);
-                y = _filt_sample(&_ytemp, &coeffs[0..6], self.x1[self.index], self.y1[self.index]);
-                self.xtemp[self.index] = x1;
-                self.ytemp[self.index] = _ytemp;
-                self.x1[self.index] = _ytemp;
-                self.y1[self.index] = y;
-                x1 = y;
-                self.index += 1;
-                self.index %= self.order; 
+                let _ytemp = coeffs[0] * x1 + coeffs[1] * self.xtemp.read() - coeffs[2] * self.ytemp.read(); 
+                y = coeffs[3] * _ytemp + coeffs[4] * self.x1.read() - coeffs[5] * self.y1.read();
+                self.xtemp.write_and_advance(&x1);
+                self.ytemp.write_and_advance(&_ytemp);
+                self.x1.write_and_advance(&_ytemp);
+                self.y1.write_and_advance(&y);
+                x1 = _ytemp;
             }
             y
         } else if self.mode.eq("br") {
             for _ in 0..self.order {
-                let _ylp = _filt_sample(&x1, &coeffs[0..3], self.xtemp[self.index], self.ytemp[self.index]);
-                let _yhp = _filt_sample(&x2, &coeffs[0..6], self.x1[self.index], self.y1[self.index]);
-                self.xtemp[self.index] = x1;
-                self.ytemp[self.index] = _ylp;
-                self.x1[self.index] = x2;
-                self.y1[self.index] = _yhp;
+                let _ylp = coeffs[0] * x1 + coeffs[1] * self.xtemp.read() - coeffs[2] * self.ytemp.read();
+                let _yhp = coeffs[3] * x2 + coeffs[4] * self.x1.read() - coeffs[5] * self.y1.read();
+                self.xtemp.write_and_advance(&x1);
+                self.ytemp.write_and_advance(&_ylp);
+                self.x1.write_and_advance(&x2);
+                self.y1.write_and_advance(&_yhp);
                 y = _ylp + _yhp;
                 x1 = _ylp;
                 x2 = _yhp;
-                self.index += 1;
-                self.index %= self.order; 
             }
             y
         } else {
             for _ in 0..self.order {
-                y = _filt_sample(&x1, &coeffs, self.x1[self.index], self.y1[self.index]);
-                self.x1[self.index] = x1;
-                self.y1[self.index] = y;
-                self.index += 1;
-                self.index %= self.order;
+                y = coeffs[0] * x1 + coeffs[1] * self.x1.read() - coeffs[2] * self.y1.read();
+                self.x1.write_and_advance(&x1);
+                self.y1.write_and_advance(&y);
                 x1 = y;
             }
             y
@@ -311,11 +285,10 @@ impl Butter {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.xtemp = vec![0.0; self.order];
-        self.ytemp = vec![0.0; self.order];
-        self.x1 = vec![0.0; self.order];
-        self.y1 = vec![0.0; self.order];
-        self.index = 0;
+        self.xtemp.clear();
+        self.ytemp.clear();
+        self.x1.clear();
+        self.y1.clear();
         println!("[DONE] cache cleared!")
     }
 }

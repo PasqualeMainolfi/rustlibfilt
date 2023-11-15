@@ -1,7 +1,7 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::new_without_default)]
 
-use super::{filtertype::{FilterType, OnePoleFilterType}, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, OnePoleFilterType}, coeffstruct::OnePoleCoeffs, delayline::DelayLine};
 use pyo3::prelude::*;
 
 pub struct DesignOnePoleFilter {
@@ -43,17 +43,13 @@ impl DesignOnePoleFilter {
 
 }
 
-fn _filt_sample(x: &f64, coeffs: &(f64, f64, f64), x1: f64, y1: f64) -> f64 {
-    coeffs.0 * x + coeffs.1 * x1 + coeffs.2 * y1
-}
 
 #[pyclass]
 pub struct OnePole {
     fs: f64,
-    x: Vec<f64>,
-    y: Vec<f64>,
+    x: DelayLine,
+    y: DelayLine,
     order: usize,
-    index: usize
 }
 
 #[pymethods]
@@ -81,10 +77,9 @@ impl OnePole {
         
         Self { 
             fs, 
-            x: vec![0.0; filt_order], 
-            y: vec![0.0; filt_order],
+            x: DelayLine::new(filt_order), 
+            y: DelayLine::new(filt_order),
             order: filt_order,
-            index: 0
         }
     }
 
@@ -150,12 +145,10 @@ impl OnePole {
         let mut x = sample;
         let mut y: f64 = 0.0;
         for _ in 0..self.order {
-            y = _filt_sample(&x, &coeffs, self.x[self.index], self.y[self.index]);
-            self.x[self.index] = x;
-            self.y[self.index] = y;
+            y = coeffs.0 * x + coeffs.1 * self.x.read() + coeffs.2 * self.y.read();
+            self.x.write_and_advance(&x);
+            self.y.write_and_advance(&y);
             x = y;
-            self.index += 1;
-            self.index %= self.order;
         }
 
         y
@@ -198,9 +191,8 @@ impl OnePole {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.x = vec![0.0; self.order];
-        self.y = vec![0.0; self.order];
-        self.index = 0;
+        self.x.clear();
+        self.y.clear();
         println!("[DONE] cache cleared!")
     }
 

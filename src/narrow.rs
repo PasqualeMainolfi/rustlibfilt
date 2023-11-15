@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use pyo3::prelude::*;
-use super::{filtertype::{FilterType, NarrowFilterType}, coeffstruct::BiquadCoeffs};
+use super::{filtertype::{FilterType, NarrowFilterType}, coeffstruct::BiquadCoeffs, delayline::DelayLine};
 
 struct DesignNarrowFilter {
     mode: FilterType,
@@ -58,19 +58,14 @@ impl DesignNarrowFilter {
 
 }
 
-fn _filt_sample(x: &f64, coeffs: &(f64, f64, f64, f64, f64, f64), x1: f64, x2: f64, y1: f64, y2: f64) -> f64 {
-    coeffs.0 * x + coeffs.1 * x1 + coeffs.2 * x2 + coeffs.4 * y1 + coeffs.5 * y2
-}
-
 #[pyclass]
 pub struct Narrow {
     fs: f64,
-    x1: Vec<f64>,
-    x2: Vec<f64>,
-    y1: Vec<f64>,
-    y2: Vec<f64>,
+    x1: DelayLine,
+    x2: DelayLine,
+    y1: DelayLine,
+    y2: DelayLine,
     order: usize,
-    index: usize
 }
 
 #[pymethods]
@@ -99,12 +94,11 @@ impl Narrow {
 
         Self { 
             fs, 
-            x1: vec![0.0; filt_order], 
-            x2: vec![0.0; filt_order], 
-            y1: vec![0.0; filt_order], 
-            y2: vec![0.0; filt_order],
+            x1: DelayLine::new(filt_order), 
+            x2: DelayLine::new(filt_order), 
+            y1: DelayLine::new(filt_order), 
+            y2: DelayLine::new(filt_order),
             order: filt_order,
-            index: 0 
         }
     }
     
@@ -180,17 +174,14 @@ impl Narrow {
         let mut x = sample;
         let mut y: f64 = 0.0;
         for _ in 0..self.order {
-            y = _filt_sample(&sample, &coeffs, self.x1[self.index], self.x2[self.index], self.y1[self.index], self.y2[self.index]);
+            y = coeffs.0 * x + coeffs.1 * self.x1.read() + coeffs.2 * self.x2.read() + coeffs.4 * self.y1.read() + coeffs.5 * self.y2.read();
 
-            self.x2[self.index] = self.x1[self.index];
-            self.x1[self.index] = x;
-            self.y2[self.index] = self.y1[self.index];
-            self.y1[self.index] = y;
+            self.x1.write_and_advance(&x);
+            self.x2.write_and_advance(&x);
+            self.y1.write_and_advance(&y);
+            self.y2.write_and_advance(&y);
 
             x = y;
-
-            self.index += 1;
-            self.index %= self.order;
 
         }
 
@@ -234,11 +225,10 @@ impl Narrow {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self.x1 = vec![0.0; self.order];
-        self.x2 = vec![0.0; self.order];
-        self.y1 = vec![0.0; self.order];
-        self.y2 = vec![0.0; self.order];
-        self.index = 0;
+        self.x1.clear();
+        self.x2.clear();
+        self.y1.clear();
+        self.y2.clear();
         println!("[DONE] cache cleared!")
     }
 

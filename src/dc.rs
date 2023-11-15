@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::single_match)]
 
-use super::{filtertype::{FilterType, DcBlockFilterType}, coeffstruct::OnePoleCoeffs};
+use super::{filtertype::{FilterType, DcBlockFilterType}, coeffstruct::OnePoleCoeffs, delayline::DelayLine};
 use pyo3::prelude::*;
 
 struct DesignDcFilter {
@@ -44,8 +44,8 @@ fn _filt_sample(x: &f64, coeffs: &(f64, f64), x1: f64, y1: f64) -> f64 {
 #[pyclass]
 pub struct DcFilter {
     fs: f64,
-    _x: f64,
-    _y: f64
+    _x: DelayLine,
+    _y: DelayLine
 }
 
 #[pymethods]
@@ -62,7 +62,7 @@ impl DcFilter {
     ///
     
     pub fn new(fs: f64) -> Self {
-        Self { fs, _x: 0.0, _y: 0.0 }
+        Self { fs, _x: DelayLine::new(1), _y: DelayLine::new(1) }
     }
 
     ///
@@ -119,9 +119,9 @@ impl DcFilter {
 
     #[pyo3(text_signature = "(sample: float, coeffs: tuple[float, float]) -> float")]
     pub fn filt_sample(&mut self, sample: f64, coeffs: (f64, f64)) -> f64 {
-        let y = _filt_sample(&sample, &coeffs, self._x, self._y);
-        self._x = sample;
-        self._y = y;
+        let y = coeffs.0 * sample - self._x.read() + coeffs.1 * self._y.read();
+        self._x.write_and_advance(&sample);
+        self._y.write_and_advance(&y);
         y
     }
 
@@ -161,8 +161,8 @@ impl DcFilter {
     ///
 
     pub fn clear_delayed_samples_cache(&mut self) {
-        self._x = 0.0;
-        self._y = 0.0;
+        self._x.clear();
+        self._y.clear();
         println!("[DONE] cache cleared!")
     }
 

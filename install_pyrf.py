@@ -5,7 +5,7 @@ import os
 # main scripts
 CWD = os.getcwd()
 OPS = os.name
-_pyft = "pyrustlibfilt/pyft.py" if OPS == "posix" else "pyrustlibfilt\pyft.py"
+_pyft = "pyrustlibfilt/pyrf.py" if OPS == "posix" else "pyrustlibfilt\pyrf.py"
 PYFT_PATH = os.path.join(CWD, _pyft)
 IMPORT_STRING = "from rustlibfilt.pyrf import Rustlibfilt\n"
 

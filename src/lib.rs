@@ -1,3 +1,4 @@
+pub mod delayline;
 pub mod biquadeq;
 pub mod twozerotwopole;
 pub mod filtertype;
